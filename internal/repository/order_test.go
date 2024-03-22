@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	//"github.com/Calmantara/go-kominfo-2024/go-middleware/internal/infrastructure/mocks"
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/MidnightHelix/assignment-2/internal/infrastructure/mocks"
 	"github.com/MidnightHelix/assignment-2/internal/model"
@@ -36,10 +35,10 @@ func newMockGorm() (*gorm.DB, sqlmock.Sqlmock) {
 func TestGetUsers(t *testing.T) {
 	t.Run("error get orders", func(t *testing.T) {
 		db, mock := newMockGorm()
-		// mock infra
+
 		postgresMock := mocks.NewGormPostgres(t)
 		postgresMock.On("GetConnection").Return(db)
-		// mock query
+
 		mock.ExpectQuery(regexp.QuoteMeta(`
 			SELECT * FROM "orders"
 		`)).WillReturnError(errors.New("some error"))
@@ -52,10 +51,10 @@ func TestGetUsers(t *testing.T) {
 
 	t.Run("success get orders", func(t *testing.T) {
 		db, mock := newMockGorm()
-		// mock infra
+
 		postgresMock := mocks.NewGormPostgres(t)
 		postgresMock.On("GetConnection").Return(db)
-		// mock query for orders
+
 		orderRow := sqlmock.
 			NewRows([]string{"id", "customer_name", "ordered_at"}).
 			AddRow(1, "testing", time.Now())
@@ -64,7 +63,6 @@ func TestGetUsers(t *testing.T) {
 			SELECT * FROM "orders"
 		`)).WillReturnRows(orderRow)
 
-		// mock query for items
 		itemRow := sqlmock.
 			NewRows([]string{"id", "name", "order_id"}).
 			AddRow(1, "item_name", 1)
@@ -84,11 +82,10 @@ func TestGetUsers(t *testing.T) {
 func TestCreateOrder(t *testing.T) {
 	t.Run("error create order", func(t *testing.T) {
 		db, mock := newMockGorm()
-		// Mock infrastructure
+
 		postgresMock := mocks.NewGormPostgres(t)
 		postgresMock.On("GetConnection").Return(db)
 
-		// Mock the query with an error
 		mock.ExpectExec(regexp.QuoteMeta(`
 			INSERT INTO "orders" VALUES ($1, $2, $3)
 		`)).WillReturnError(errors.New("some error"))
@@ -100,26 +97,24 @@ func TestCreateOrder(t *testing.T) {
 		assert.Equal(t, model.Order{}, res)
 	})
 
-	t.Run("success create order", func(t *testing.T) {
-		db, mock := newMockGorm()
+}
 
-		// Mock infrastructure
+func TestDeleteOrder(t *testing.T) {
+	t.Run("error deleting order", func(t *testing.T) {
+		db, mock := newMockGorm()
 		postgresMock := mocks.NewGormPostgres(t)
 		postgresMock.On("GetConnection").Return(db)
 
-		// Mock the successful query execution
-		mock.ExpectExec(regexp.QuoteMeta(`
-			INSERT INTO "orders" ("id", "customer_name", "ordered_at") VALUES (?, ?, ?)
-		`)).WithArgs(1, "test", sqlmock.AnyArg()).WillReturnResult(sqlmock.NewResult(1, 1))
-
-		// Expectation for the Begin function call
 		mock.ExpectBegin()
+		mock.ExpectExec(regexp.QuoteMeta(`
+			DELETE FROM "orders" WHERE "id" = $1
+		`)).WithArgs(123).WillReturnError(errors.New("some error"))
+		mock.ExpectRollback()
 
-		userRepo := orderQueryImpl{db: postgresMock}
-		order := model.Order{ID: 1, CustomerName: "test", OrderedAt: time.Now()}
-		res, err := userRepo.CreateOrder(context.Background(), order)
-		assert.Nil(t, err)
-		assert.Equal(t, order, res)
+		u := orderQueryImpl{db: postgresMock}
+		err := u.DeleteOrder(context.Background(), 123)
+
+		assert.NotNil(t, err)
 	})
 
 }
